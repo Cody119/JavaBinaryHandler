@@ -1,7 +1,7 @@
 package com.unfortunatelySober.old;
 
-import com.unfortunatelySober.IDSerializer;
-import com.unfortunatelySober.IISerializer;
+import com.unfortunatelySober.serializer.IDSerializer;
+import com.unfortunatelySober.serializer.IISerializer;
 
 import java.io.IOException;
 import java.io.InputStream;

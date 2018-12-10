@@ -1,4 +1,4 @@
-package com.unfortunatelySober;
+package com.unfortunatelySober.serializer;
 
 import java.io.IOException;
 import java.io.InputStream;

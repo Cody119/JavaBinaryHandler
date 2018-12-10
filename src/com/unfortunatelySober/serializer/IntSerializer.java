@@ -1,4 +1,6 @@
-package com.unfortunatelySober;
+package com.unfortunatelySober.serializer;
+
+import com.unfortunatelySober.Util;
 
 import java.io.IOException;
 import java.io.InputStream;
@@ -42,5 +44,11 @@ public class IntSerializer implements IISerializer {
     @Override
     public void serialize(Object e, OutputStream stream) throws IOException {
         writeInt(stream, ((Integer) e));
+    }
+
+    @Override
+    public void serializeWith(Object e, OutputStream stream, Object ... objects) throws IOException {
+        Util.with(objects, x -> System.out.println(" - " + x.toString()));
+        serialize(e, stream);
     }
 }
