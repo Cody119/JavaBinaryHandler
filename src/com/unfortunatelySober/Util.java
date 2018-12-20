@@ -1,5 +1,6 @@
 package com.unfortunatelySober;
 
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.function.Consumer;
@@ -67,47 +68,57 @@ public final class Util {
         return r;
     }
 
-    public static String[] s(String ... args) {
-        return args;
+    public static <T> T[] ensureSize(T[] original, int index, Class<? extends T[]> newType) {
+        if (index+1 > original.length) {
+            return Arrays.copyOf(original, index+1, newType);
+        } else {
+            return original;
+        }
     }
 
-    public static Integer[] box(int[] x) {
-        Integer[] ret = new Integer[x.length];
-        for (int i = 0; i < x.length; i++) {
-            ret[i] = x[i];
+    public final static class Statics{
+        public static String[] s (String ...args){
+            return args;
         }
-        return ret;
-    }
 
-    public static Character[] box(char[] x) {
-        Character[] ret = new Character[x.length];
-        for (int i = 0; i < x.length; i++) {
-            ret[i] = x[i];
+        public static Integer[] box ( int[] x){
+            Integer[] ret = new Integer[x.length];
+            for (int i = 0; i < x.length; i++) {
+                ret[i] = x[i];
+            }
+            return ret;
         }
-        return ret;
-    }
 
-    public static Long[] box(long[] x) {
-        Long[] ret = new Long[x.length];
-        for (int i = 0; i < x.length; i++) {
-            ret[i] = x[i];
+        public static Character[] box ( char[] x){
+            Character[] ret = new Character[x.length];
+            for (int i = 0; i < x.length; i++) {
+                ret[i] = x[i];
+            }
+            return ret;
         }
-        return ret;
-    }
 
-    public static Float[] box(float[] x) {
-        Float[] ret = new Float[x.length];
-        for (int i = 0; i < x.length; i++) {
-            ret[i] = x[i];
+        public static Long[] box ( long[] x){
+            Long[] ret = new Long[x.length];
+            for (int i = 0; i < x.length; i++) {
+                ret[i] = x[i];
+            }
+            return ret;
         }
-        return ret;
-    }
 
-    public static Double[] box(double[] x) {
-        Double[] ret = new Double[x.length];
-        for (int i = 0; i < x.length; i++) {
-            ret[i] = x[i];
+        public static Float[] box ( float[] x){
+            Float[] ret = new Float[x.length];
+            for (int i = 0; i < x.length; i++) {
+                ret[i] = x[i];
+            }
+            return ret;
         }
-        return ret;
+
+        public static Double[] box ( double[] x){
+            Double[] ret = new Double[x.length];
+            for (int i = 0; i < x.length; i++) {
+                ret[i] = x[i];
+            }
+            return ret;
+        }
     }
 }

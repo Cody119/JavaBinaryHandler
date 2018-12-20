@@ -1,6 +1,7 @@
 package com.unfortunatelySober;
 
 import com.sun.xml.internal.messaging.saaj.util.ByteInputStream;
+import com.unfortunatelySober.annotations.SerializeAction;
 import com.unfortunatelySober.annotations.Serializer;
 import com.unfortunatelySober.annotations.SerializerField;
 import com.unfortunatelySober.serializer.CompositeSerializer;
@@ -11,6 +12,10 @@ import java.io.ByteArrayOutputStream;
 import java.lang.reflect.Field;
 import java.util.function.BiConsumer;
 import java.util.function.Function;
+
+
+import static com.unfortunatelySober.Util.Statics.box;
+import static com.unfortunatelySober.Util.Statics.s;
 
 
 //TODO error handling
@@ -51,12 +56,26 @@ public class Main {
     public static class test4 {
         @SerializerField(order = 0)
         public int x;
-        @SerializerField(order = 1, arguments = {"x"})
+        @SerializerField(order = 1)
         public int y;
-        @SerializerField(order = 2, arguments = {"x", "y"})
+        @SerializerField(order = 2, action = SerializeAction.SERIALIZE_ONLY)
+        public int getZ() {
+            System.out.println("get z");
+            return z;
+        }
+        @SerializerField(order = 2, action = SerializeAction.DESERIALIZE_ONLY)
+        public void setZ(int zIn) {
+            System.out.println("set z");
+            z = zIn;
+        }
+
         public int z;
 
 
+    }
+
+    public static class test5 {
+        public void test(int x, double y, float ... args) { }
     }
 
     static class TBuf extends ByteArrayOutputStream {
@@ -78,6 +97,10 @@ public class Main {
         test2();
         test3();
         test4();
+
+//        Util.with(test5.class.getMethods()[0].getParameterTypes(), x -> System.out.println(x.getName()));
+//        System.out.println(float[].class.getName());
+//        System.out.println(test5.class.getMethods()[0].isVarArgs());
 
 //        CompositeSerializer.test(test3.class, new test3());
     }
@@ -125,7 +148,7 @@ public class Main {
                 .Getters( (o -> ((int[]) g.apply(o)).length) , (g), g1)
                 .Setters( (o, v) -> {}, s, s1)
                 .Serializers(IntSerializer.INSTANCE, new IntArraySer(), IntSerializer.INSTANCE)
-                .Arguments(Util.s(), Util.s("l"))
+                .Arguments(s(), s("l"))
                 .build();
 
         TBuf b = new TBuf(1024);
@@ -136,7 +159,7 @@ public class Main {
 
         y.serialize(t, b);
         test2 t2 = (test2) y.deserialize(new ByteInputStream(b.getBuf(), b.getBuf().length));
-        Util.with(Util.box(t2.x), x -> System.out.println(" - " + x.toString()));
+        Util.with(box(t2.x), x -> System.out.println(" - " + x.toString()));
         System.out.println(t.t);
 
         return;

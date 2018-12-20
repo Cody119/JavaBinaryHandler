@@ -4,6 +4,7 @@ import com.unfortunatelySober.ReflectionUtil;
 
 import java.lang.reflect.Field;
 import java.util.HashMap;
+import java.util.Map;
 import java.util.function.BiConsumer;
 import java.util.function.Function;
 
@@ -12,9 +13,11 @@ import java.util.function.Function;
  */
 public class Serializers {
 
+    public static final int DEFAULT_SIZE = 10;
+
     private Serializers() {}
 
-    public static final HashMap<Class, IDSerializer> SERIALIZERS = new HashMap<>();
+    public static final Map<Class, IDSerializer> SERIALIZERS = new HashMap<>();
 
     static {
         SERIALIZERS.put(int.class, IntSerializer.INSTANCE);

@@ -13,4 +13,5 @@ import  java.lang.annotation.ElementType;
 @Retention(RetentionPolicy.RUNTIME)
 public @interface Serializer {
     AccessMod access() default AccessMod.PUBLIC;
+
 }

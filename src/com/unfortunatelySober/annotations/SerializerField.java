@@ -13,6 +13,7 @@ import java.lang.annotation.Target;
 @Retention(RetentionPolicy.RUNTIME)
 public @interface SerializerField {
     int order();
+    String name() default "";
     String[] arguments() default {};
     SerializeAction action() default SerializeAction.BOTH;
 }
