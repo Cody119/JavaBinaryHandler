@@ -14,18 +14,35 @@ public final class Util {
 
     private Util() {}
 
-    public static <T, R> R[] map(T[] ar, Function<T, R> f, Function<Integer, R[]> con) {
-        return map(ar, f, con.apply(ar.length));
-    }
-
     public static <T> void with(T[] ar, Consumer<T> f) {
         for (int i = 0; i < ar.length; i++) {
             f.accept(ar[i]);
         }
     }
 
+    public static <T, R> R[] map(T[] ar, Function<T, R> f, Function<Integer, R[]> con) {
+        return map(ar, f, con.apply(ar.length));
+    }
+
+    public static <T, R> R[] map(T[] ar, Function<T, R> f, Function<Integer, R[]> con, int s) {
+        return map(ar, f, con.apply(s + ar.length), s);
+    }
+
+    /**
+     *
+     * @param ar
+     * @param f
+     * @param ret
+     * @param <T>
+     * @param <R>
+     * @return
+     */
     public static <T, R> R[] map(T[] ar, Function<T, R> f, R[] ret) {
-        for (int i = 0; i < ar.length; i++) {
+        return map(ar, f, ret, 0);
+    }
+
+    public static <T, R> R[] map(T[] ar, Function<T, R> f, R[] ret, int s) {
+        for (int i = s; i < ar.length; i++) {
             ret[i] = f.apply(ar[i]);
         }
         return ret;

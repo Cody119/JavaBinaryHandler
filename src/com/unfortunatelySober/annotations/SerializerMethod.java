@@ -6,14 +6,14 @@ import java.lang.annotation.RetentionPolicy;
 import java.lang.annotation.Target;
 
 /**
- * Created by Cody on 11/12/2018.
+ * Created by Cody on 20/12/2018.
  */
 
-@Target({ElementType.FIELD})
+@Target({ElementType.CONSTRUCTOR, ElementType.METHOD})
 @Retention(RetentionPolicy.RUNTIME)
-public @interface SerializerField {
+public @interface SerializerMethod {
     int order();
     String name() default "";
     String[] arguments() default {};
-    SerializeFieldAction action() default SerializeFieldAction.BOTH;
+    SerializerMethodAction action();
 }

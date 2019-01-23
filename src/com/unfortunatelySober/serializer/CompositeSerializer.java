@@ -1,26 +1,29 @@
 package com.unfortunatelySober.serializer;
 
+import com.unfortunatelySober.RAList;
 import com.unfortunatelySober.ReflectionUtil;
 import com.unfortunatelySober.Util;
 import com.unfortunatelySober.annotations.Constant;
 import com.unfortunatelySober.annotations.Serializer;
 import com.unfortunatelySober.annotations.SerializerField;
+import com.unfortunatelySober.annotations.SerializerMethod;
 
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.lang.reflect.*;
-import java.util.Arrays;
 import java.util.HashMap;
+import java.util.Map;
 import java.util.Objects;
 import java.util.function.BiConsumer;
+import java.util.function.BiFunction;
 import java.util.function.Function;
 import java.util.function.Supplier;
 
 public class CompositeSerializer implements IISerializer {
 
-    private Function<Object, Object>[] getters;
-    private BiConsumer<Object, Object>[] setters;
+    private BiFunction<Object, Object[], Object>[] getters;
+    private BiConsumer<Object, Object[]>[] setters;
     private Supplier<Object> constructor;
     private Class innerClass;
     private IDSerializer[] serializers;
@@ -30,8 +33,8 @@ public class CompositeSerializer implements IISerializer {
     private CompositeSerializer(Class clazzIn,
                                Supplier<Object> constructorIn,
                                String[] namesIn,
-                               Function<Object, Object>[] gettersIn,
-                               BiConsumer<Object, Object>[] settersIn,
+                               BiFunction<Object, Object[], Object>[] gettersIn,
+                               BiConsumer<Object, Object[]>[] settersIn,
                                String[][] arguments,
                                IDSerializer ... serializersIn) {
         innerClass = clazzIn;
@@ -53,8 +56,12 @@ public class CompositeSerializer implements IISerializer {
         Object o = constructor.get();
         final Object[] objects = new Object[serializers.length];
         for (int i = 0; i < serializers.length; i++) {
-            Object oi = serializers[i].deserializeWith(stream, Util.map(argumentTags[i], j -> objects[j], Object[]::new));
-            setters[i].accept(o, oi);
+            Object[] arguments = Util.map(argumentTags[i], j -> objects[j], Object[]::new);
+            Object oi = serializers[i].deserializeWith(stream, arguments);
+            Object[] arguments2 = new Object[arguments.length + 1];
+            System.arraycopy(arguments, 0, arguments2, 1, arguments.length);
+            arguments2[0] = oi;
+            setters[i].accept(o, arguments2);
             objects[i] = oi;
         }
         return o;
@@ -62,12 +69,16 @@ public class CompositeSerializer implements IISerializer {
 
     @Override
     public void serialize(Object e, OutputStream stream) throws IOException {
+        final Object[] objects = new Object[serializers.length];
         for (int i = 0; i < serializers.length; i++) {
-            serializers[i].serializeWith(getters[i].apply(e), stream, Util.map(argumentTags[i], j -> getters[j].apply(e), Object[]::new));
+            Object[] arguments = Util.map(argumentTags[i], j -> objects[j], Object[]::new);
+            Object o = getters[i].apply(e, arguments);
+            serializers[i].serializeWith(o, stream, arguments);
+            objects[i] = o;
         }
     }
 
-    private Integer[][] buildArgumentTable(String[][] arguments, String[] names) {
+    public static Integer[][] buildArgumentTable(String[][] arguments, String[] names) {
         Integer[][] argumentTags;
         if (arguments != null) {
             argumentTags = new Integer[names.length][];
@@ -104,91 +115,131 @@ public class CompositeSerializer implements IISerializer {
 
     private static CompositeSerializer specificBuild(Serializer x, Class clazz) throws NoSuchMethodException {
         Method[] methods = ReflectionUtil.getMethods(clazz, x.access());
-        Method[] getterMeths = new Method[methods.length];
-        Method[] setterMeths = new Method[methods.length];
-        String[] names = new String[0];
-        String[][] arguments = new String[0][0];
-
-        int gMax = 0;
-        int sMax = 0;
+        RAList<Method> getterMeths = new RAList<>(Serializers.DEFAULT_SIZE);
+        RAList<Method> setterMeths = new RAList<>(Serializers.DEFAULT_SIZE);
+        RAList<String> names = new RAList<>(Serializers.DEFAULT_SIZE);
+        RAList<String[]> arguments = new RAList<>(Serializers.DEFAULT_SIZE);
 
         for (Method method : methods) {
-            SerializerField serializerField;
-            if ((serializerField = method.getAnnotation(SerializerField.class)) != null) {
+            SerializerMethod serializerField;
+            if ((serializerField = method.getAnnotation(SerializerMethod.class)) != null) {
                 int i = serializerField.order();
-                names = Util.ensureSize(names, i, String[].class);
-                arguments = Util.ensureSize(arguments, i, String[][].class);
 
                 switch (serializerField.action()) {
-                    case BOTH:
-                        throw new RuntimeException("NOT POSSIBLE");
                     case SERIALIZE_ONLY:
-                        getterMeths = Util.ensureSize(getterMeths, i, Method[].class);
-                        getterMeths[i] = method;
-                        gMax = Math.max(gMax, i);
+                        getterMeths.set(i, method);
                         break;
                     case DESERIALIZE_ONLY:
-                        setterMeths = Util.ensureSize(setterMeths, i, Method[].class);
-                        setterMeths[i] = method;
-                        sMax = Math.max(sMax, i);
+                        setterMeths.set(i, method);
                         break;
                 }
-                arguments[i] = serializerField.arguments();
-                names[i] = serializerField.name().isEmpty() ? method.getName() : serializerField.name();
+                arguments.set(i, serializerField.arguments());
+                names.set(i, serializerField.name().isEmpty() ? method.getName() : serializerField.name());
             }
         }
 
-        int fMax = 0;
-
         Field[] fields = ReflectionUtil.getFields(clazz, x.access());
-        Field[] sortedFields = new Field[fields.length];
+        RAList<Field> sortedFields = new RAList<>(Serializers.DEFAULT_SIZE);
+
         for (Field f : fields) {
             SerializerField serializerField;
             if ((serializerField = f.getAnnotation(SerializerField.class)) != null) {
                 int i = serializerField.order();
-                sortedFields = Util.ensureSize(sortedFields, i, Field[].class);
-                names = Util.ensureSize(names, i, String[].class);
-                arguments = Util.ensureSize(arguments, i, String[][].class);
 
-                fMax = Math.max(fMax, i);
-
-                arguments[i] = serializerField.arguments();
-                names[i] = f.getName();
-                sortedFields[i] = f;
+                arguments.set(i, serializerField.arguments());
+                names.set(i, f.getName());
+                sortedFields.set(i, f);
             }
         }
 
-        int size = Math.max(Math.max(gMax, sMax), fMax)+1;
-
-
-        Function<Object, Object>[] getters = new Function[size];
-        BiConsumer<Object, Object>[] setters = new BiConsumer[size];
-
-        for (int i = 0; i < Math.min(getterMeths.length, size); i++) {
-            if (getterMeths[i] != null) {
-                getters[i] = ReflectionUtil.getterHandle(getterMeths[i]);
-            }
+        int size = Math.max(Math.max(getterMeths.size(), setterMeths.size()), sortedFields.size());
+        int lastIndex = size-1;
+        if (getterMeths.size() < size) {
+            getterMeths.set(lastIndex, null);
         }
-        for (int i = 0; i < Math.min(setterMeths.length, size); i++) {
-            if (setterMeths[i] != null) {
-                setters[i] = ReflectionUtil.setterHandle(setterMeths[i]);
-            }
+        if (setterMeths.size() < size) {
+            setterMeths.set(lastIndex, null);
         }
-        for (int i = 0; i < sortedFields.length; i++) {
-            if (sortedFields[i] != null) {
-                boolean unussed = true;
-                if (getterMeths.length > i && getterMeths[i] == null) {
-                    getters[i] = ReflectionUtil.getterHandle(sortedFields[i]);
-                    unussed = false;
-                }
-                if (setterMeths.length > i && setterMeths[i] == null) {
-                    setters[i] = ReflectionUtil.setterHandle(sortedFields[i]);
-                    unussed = false;
-                }
-                if (unussed) {
-                    throw new RuntimeException("Field unused: " + sortedFields[i].getName());
-                }
+        if (sortedFields.size() < size) {
+            sortedFields.set(lastIndex, null);
+        }
+
+
+        BiFunction<Object, Object[], Object>[] getters = new BiFunction[size];
+        BiConsumer<Object, Object[]>[] setters = new BiConsumer[size];
+//
+//        for (int i = 0; i < size; i++) {
+//            if (getterMeths.get(i) != null) {
+//                getters[i] = ReflectionUtil.getterHandle(getterMeths.get(i));
+//            }
+//        }
+//        for (int i = 0; i < size; i++) {
+//            if (setterMeths.get(i) != null) {
+//                setters[i] = ReflectionUtil.setterHandle(setterMeths.get(i));
+//            }
+//        }
+//        for (int i = 0; i < sortedFields.size(); i++) {
+//            if (sortedFields.get(i) != null) {
+//                boolean unussed = true;
+//                if (getterMeths.get(i) == null) {
+//                    getters[i] = ReflectionUtil.getterHandle(sortedFields.get(i));
+//                    unussed = false;
+//                }
+//                if (setterMeths.get(i) == null) {
+//                    setters[i] = ReflectionUtil.setterHandle(sortedFields.get(i));
+//                    unussed = false;
+//                }
+//                if (unussed) {
+//                    throw new RuntimeException("Field unused: " + sortedFields.get(i).getName());
+//                }
+//            }
+//        }
+
+        Map<String, Class> typeMap = new HashMap<>();
+
+        for (int i = 0; i < size; i++) {
+            Method getterMethod = getterMeths.get(i);
+            Field field = sortedFields.get(i);
+            Method setterMethod = setterMeths.get(i);
+
+            boolean gM = getterMethod != null;
+            boolean sM = setterMethod != null;
+            boolean fM = field != null;
+
+            if (fM && gM && sM) throw new RuntimeException("Field unused: " + field.getName());
+            if (!fM && !(gM || sM)) throw new RuntimeException("no handle for: " + i);
+
+            Class type = ReflectionUtil.typeDiscern(
+                    gM ? getterMethod.getReturnType() : null,
+                    sM ? setterMethod.getParameterTypes()[0] : null,
+                    fM ? field.getType() : null
+            );
+
+            if (type == null) throw new RuntimeException("Type Discern failed");
+
+            Class[] getterTypes = Util.map(arguments.get(i), typeMap::get, Class[]::new);
+            if (gM) {
+                if (!ReflectionUtil.checkArguments(getterMethod, getterTypes) || !type.isAssignableFrom(getterMethod.getReturnType()))
+                    throw new RuntimeException("Argument check failed for getter");
+                getters[i] = ReflectionUtil.getterHandle(getterMethod);
+            } else {
+                getters[i] = ReflectionUtil.getterHandle(field);
             }
+
+            if (sM) {
+                Class[] setterTypes = new Class[getterTypes.length + 1];
+                System.arraycopy(getterTypes, 0, setterTypes, 1, getterTypes.length);
+                setterTypes[0] = type;
+
+                if (!ReflectionUtil.checkArguments(setterMethod, setterTypes))
+                    throw new RuntimeException("Argument check failed for setter");
+                setters[i] = ReflectionUtil.setterHandle(setterMethod);
+            } else {
+                setters[i] = ReflectionUtil.setterHandle(field);
+            }
+
+
+            typeMap.put(names.get(i), type);
         }
 
         for (int i = 0; i < getters.length; i++) {
@@ -202,7 +253,7 @@ public class CompositeSerializer implements IISerializer {
 
         Supplier<Object> constructor = ReflectionUtil.constructorHandle(clazz);
 
-        return new CompositeSerializer(clazz, constructor, names, getters, setters, arguments, serializers);
+        return new CompositeSerializer(clazz, constructor, names.toArray(String[]::new), getters, setters, arguments.toArray(String[][]::new), serializers);
     }
 
     //TODO lengths
@@ -211,8 +262,8 @@ public class CompositeSerializer implements IISerializer {
         private Class clazz;
         private Supplier<Object> constructor;
         private String[] names;
-        private Function<Object, Object>[] getters;
-        private BiConsumer<Object, Object>[] setters;
+        private BiFunction<Object, Object[],Object>[] getters;
+        private BiConsumer<Object, Object[]>[] setters;
         private IDSerializer[] serializers;
         private String[][] arguments;
 
@@ -239,13 +290,13 @@ public class CompositeSerializer implements IISerializer {
         }
 
         @SafeVarargs
-        public final Builder Getters(Function<Object, Object> ... gettersIn) {
+        public final Builder Getters(BiFunction<Object, Object[], Object> ... gettersIn) {
             getters = gettersIn;
             return this;
         }
 
         @SafeVarargs
-        public final Builder Setters(BiConsumer<Object, Object> ... settersIn) {
+        public final Builder Setters(BiConsumer<Object, Object[]> ... settersIn) {
             setters = settersIn;
             return this;
         }
@@ -256,7 +307,7 @@ public class CompositeSerializer implements IISerializer {
 
         public final Builder GFields(Field ... fields) {
 
-            getters = Util.map(fields, f -> ReflectionUtil.getterHandle(f), Function[]::new);
+            getters = Util.map(fields, ReflectionUtil::getterHandle, BiFunction[]::new);
             return this;
         }
 

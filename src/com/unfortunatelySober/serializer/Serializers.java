@@ -6,6 +6,7 @@ import java.lang.reflect.Field;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.function.BiConsumer;
+import java.util.function.BiFunction;
 import java.util.function.Function;
 
 /**
@@ -28,9 +29,9 @@ public class Serializers {
         return SERIALIZERS.get(clazz);
     }
 
-    public static BiConsumer<Object, Object> cSetterHandle(Field f) {
-        Function<Object, Object> g = ReflectionUtil.getterHandle(f);
-        return (o, v) -> {assert g.apply(o).equals(v);};
+    public static BiConsumer<Object, Object[]> cSetterHandle(Field f) {
+        BiFunction<Object, Object[], Object> g = ReflectionUtil.getterHandle(f);
+        return (o, v) -> {assert g.apply(o, null).equals(v);};
     }
 
     public static BiConsumer<Object, Object> sSetterHandle(Object oIn) {

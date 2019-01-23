@@ -10,6 +10,7 @@ import java.lang.reflect.Method;
 import java.util.HashMap;
 import java.util.Objects;
 import java.util.function.BiConsumer;
+import java.util.function.BiFunction;
 import java.util.function.Function;
 import java.util.function.Supplier;
 
@@ -54,8 +55,8 @@ public class ReflectionUtil {
 
     }
 
-    public static Function<Object, Object> getterHandle(Field f) {
-        return (x) -> {
+    public static BiFunction<Object, Object[], Object> getterHandle(Field f) {
+        return (x, v) -> {
             try {
                 return f.get(x);
             } catch (IllegalAccessException err) {
@@ -64,27 +65,27 @@ public class ReflectionUtil {
         };
     }
 
-    public static Function<Object, Object> getterHandle(Method m) {
-        return (o) -> {
+    public static BiFunction<Object, Object[], Object> getterHandle(Method m) {
+        return (o, v) -> {
             try {
-                return m.invoke(o);
+                return m.invoke(o, v);
             } catch (Exception e) {
                 throw new RuntimeException(e);
             }
         };
     }
 
-    public static BiConsumer<Object, Object> setterHandle(Field f) {
+    public static BiConsumer<Object, Object[]> setterHandle(Field f) {
         return (x, y) -> {
             try {
-                f.set(x, y);
+                f.set(x, y[0]);
             } catch (IllegalAccessException err) {
                 throw new RuntimeException(err);
             }
         };
     }
 
-    public static BiConsumer<Object, Object> setterHandle(Method m) {
+    public static BiConsumer<Object, Object[]> setterHandle(Method m) {
         return (o, v) -> {
             try {
                 m.invoke(o, v);
@@ -129,7 +130,7 @@ public class ReflectionUtil {
     }
 
     public static boolean checkArguments(Class[] args1, Class[] args2) {
-        if (args1.length == args2.length) return false;
+        if (args1.length != args2.length) return false;
         return checkArguments(args1, args2, args1.length);
     }
 
@@ -141,4 +142,29 @@ public class ReflectionUtil {
         }
         return true;
     }
+
+    public static Function<Object[], Object> generateGetter() {
+        return null;
+    }
+
+    public static Class typeDiscern(Class ... types) {
+        if (types.length == 0) return null;
+        Class type = types[0];
+        for (int i = 1; i < types.length; i++) {
+            if (types[i] != null) {
+                if (type == null) {
+                type = types[i];
+                } else {
+                    if (type.isAssignableFrom(types[i])) {
+                    } else if (types[i].isAssignableFrom(type)) {
+                        type = types[i];
+                    } else {
+                        return null;
+                    }
+                }
+            }
+        }
+        return type;
+    }
+
 }

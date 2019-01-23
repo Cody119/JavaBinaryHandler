@@ -1,9 +1,7 @@
 package com.unfortunatelySober;
 
 import com.sun.xml.internal.messaging.saaj.util.ByteInputStream;
-import com.unfortunatelySober.annotations.SerializeAction;
-import com.unfortunatelySober.annotations.Serializer;
-import com.unfortunatelySober.annotations.SerializerField;
+import com.unfortunatelySober.annotations.*;
 import com.unfortunatelySober.serializer.CompositeSerializer;
 import com.unfortunatelySober.serializer.IntArraySer;
 import com.unfortunatelySober.serializer.IntSerializer;
@@ -11,7 +9,7 @@ import com.unfortunatelySober.serializer.IntSerializer;
 import java.io.ByteArrayOutputStream;
 import java.lang.reflect.Field;
 import java.util.function.BiConsumer;
-import java.util.function.Function;
+import java.util.function.BiFunction;
 
 
 import static com.unfortunatelySober.Util.Statics.box;
@@ -58,14 +56,14 @@ public class Main {
         public int x;
         @SerializerField(order = 1)
         public int y;
-        @SerializerField(order = 2, action = SerializeAction.SERIALIZE_ONLY)
-        public int getZ() {
-            System.out.println("get z");
+        @SerializerMethod(order = 2, action = SerializerMethodAction.SERIALIZE_ONLY, arguments = {"y"})
+        public int getZ(int y) {
+            System.out.println("get z: " + y);
             return z;
         }
-        @SerializerField(order = 2, action = SerializeAction.DESERIALIZE_ONLY)
-        public void setZ(int zIn) {
-            System.out.println("set z");
+        @SerializerMethod(order = 2, action = SerializerMethodAction.DESERIALIZE_ONLY, arguments = {"y"})
+        public void setZ(int zIn, int y) {
+            System.out.println("set z:" + y);
             z = zIn;
         }
 
@@ -98,6 +96,10 @@ public class Main {
         test3();
         test4();
 
+//        RAList<Integer> x = new RAList<>(10);
+//        System.out.println(x.set(15, 12));
+//        System.out.println(x.size());
+
 //        Util.with(test5.class.getMethods()[0].getParameterTypes(), x -> System.out.println(x.getName()));
 //        System.out.println(float[].class.getName());
 //        System.out.println(test5.class.getMethods()[0].isVarArgs());
@@ -119,7 +121,7 @@ public class Main {
     }
 
     static void test4() throws Exception {
-        CompositeSerializer x = new CompositeSerializer.Builder().Class(test4.class).build();
+        CompositeSerializer x = CompositeSerializer.fromClass(test4.class);
         TBuf b = new TBuf(1024);
         test4 t = new test4();
         t.x = 17;
@@ -135,17 +137,17 @@ public class Main {
 
         Field f = test2.class.getField("x");
         Field f1 = test2.class.getField("t");
-        Function<Object, Object> g = ReflectionUtil.getterHandle(f);
-        BiConsumer<Object, Object> s = ReflectionUtil.setterHandle(f);
+        BiFunction<Object, Object[], Object> g = ReflectionUtil.getterHandle(f);
+        BiConsumer<Object, Object[]> s = ReflectionUtil.setterHandle(f);
 
-        Function<Object, Object> g1 = ReflectionUtil.getterHandle(f1);
-        BiConsumer<Object, Object> s1 = ReflectionUtil.setterHandle(f1);
+        BiFunction<Object, Object[], Object> g1 = ReflectionUtil.getterHandle(f1);
+        BiConsumer<Object, Object[]> s1 = ReflectionUtil.setterHandle(f1);
 
 
         CompositeSerializer y = new CompositeSerializer.Builder()
                 .Constructor(test2::new)
                 .Names("l", "x", "t")
-                .Getters( (o -> ((int[]) g.apply(o)).length) , (g), g1)
+                .Getters( ((o, v) -> ((int[]) g.apply(o, v)).length) , (g), g1)
                 .Setters( (o, v) -> {}, s, s1)
                 .Serializers(IntSerializer.INSTANCE, new IntArraySer(), IntSerializer.INSTANCE)
                 .Arguments(s(), s("l"))
