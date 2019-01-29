@@ -1,7 +1,7 @@
-package com.unfortunatelySober;
+package com.unfortunatelySober.util;
 
 import com.unfortunatelySober.annotations.AccessMod;
-import sun.reflect.Reflection;
+import com.unfortunatelySober.util.Util;
 
 import java.lang.reflect.Constructor;
 import java.lang.reflect.Field;
@@ -16,11 +16,19 @@ import java.util.function.Supplier;
 
 /**
  * Created by Cody on 11/12/2018.
+ *
+ * Utility functions that make use of reflection
  */
 public class ReflectionUtil {
 
     private ReflectionUtil() {}
 
+    /**
+     * Gets all the fields in a class with the specific access modifier
+     * @param clazz the class to get the fields from
+     * @param a the access mod to look for
+     * @return an array of all the fields meeting the access mod requirements
+     */
     public static Field[] getFields(Class clazz, AccessMod a) {
         if (a == AccessMod.PUBLIC) {
             return clazz.getFields();
@@ -29,6 +37,12 @@ public class ReflectionUtil {
         }
     }
 
+    /**
+     * Gets all the methods in a class with the specific access modifier
+     * @param clazz the class to get the fields from
+     * @param a the access mod to look for
+     * @return an array of all the methods meeting the access mod requirements
+     */
     public static Method[] getMethods(Class clazz, AccessMod a) {
         if (a == AccessMod.PUBLIC) {
             return clazz.getMethods();
@@ -37,6 +51,12 @@ public class ReflectionUtil {
         }
     }
 
+    /**
+     * Creates a {@link Supplier Supplier} object to create instances of the class specified.
+     * The class passed must have a 0 argument public constructor
+     * @param clazz the class to get the constructor from
+     * @return a {@link Supplier Supplier} object that creates instances of the class specified
+     */
     public static Supplier<Object> constructorHandle(Class clazz) {
         try {
             final Constructor c = clazz.getConstructor();

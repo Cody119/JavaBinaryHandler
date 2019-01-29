@@ -8,6 +8,8 @@ import java.lang.annotation.Target;
 import java.lang.annotation.ElementType;
 /**
  * Created by Cody on 9/12/2018.
+ *
+ * Denotes that the specific field should be constant
  */
 
 @Target({ElementType.FIELD})

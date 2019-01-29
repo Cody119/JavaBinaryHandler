@@ -1,6 +1,6 @@
 package com.unfortunatelySober.serializer;
 
-import com.unfortunatelySober.Util;
+import com.unfortunatelySober.util.Util;
 
 import java.io.IOException;
 import java.io.InputStream;

@@ -1,4 +1,6 @@
-package com.unfortunatelySober;
+package com.unfortunatelySober.util;
+
+import com.unfortunatelySober.serializer.IntSerializer;
 
 import java.util.Arrays;
 import java.util.HashMap;
@@ -28,21 +30,27 @@ public final class Util {
         return map(ar, f, con.apply(s + ar.length), s);
     }
 
-    /**
-     *
-     * @param ar
-     * @param f
-     * @param ret
-     * @param <T>
-     * @param <R>
-     * @return
-     */
     public static <T, R> R[] map(T[] ar, Function<T, R> f, R[] ret) {
         return map(ar, f, ret, 0);
     }
 
     public static <T, R> R[] map(T[] ar, Function<T, R> f, R[] ret, int s) {
-        for (int i = s; i < ar.length; i++) {
+        for (int i = s; i < (s + ar.length); i++) {
+            ret[i] = f.apply(ar[i - s]);
+        }
+        return ret;
+    }
+
+    public static <R> R[] map(int[] ar, Function<Integer, R> f, R[] ret) {
+        for (int i = 0; i < ar.length; i++) {
+            ret[i] = f.apply(ar[i]);
+        }
+        return ret;
+    }
+
+    public static <T> int[] map(T[] ar, Function<T, Integer> f) {
+        int[] ret = new int[ar.length];
+        for (int i = 0; i < ar.length; i++) {
             ret[i] = f.apply(ar[i]);
         }
         return ret;
@@ -98,7 +106,7 @@ public final class Util {
             return args;
         }
 
-        public static Integer[] box ( int[] x){
+        public static Integer[] box (int[] x){
             Integer[] ret = new Integer[x.length];
             for (int i = 0; i < x.length; i++) {
                 ret[i] = x[i];
@@ -106,7 +114,7 @@ public final class Util {
             return ret;
         }
 
-        public static Character[] box ( char[] x){
+        public static Character[] box (char[] x){
             Character[] ret = new Character[x.length];
             for (int i = 0; i < x.length; i++) {
                 ret[i] = x[i];
@@ -114,7 +122,7 @@ public final class Util {
             return ret;
         }
 
-        public static Long[] box ( long[] x){
+        public static Long[] box (long[] x){
             Long[] ret = new Long[x.length];
             for (int i = 0; i < x.length; i++) {
                 ret[i] = x[i];
@@ -122,7 +130,7 @@ public final class Util {
             return ret;
         }
 
-        public static Float[] box ( float[] x){
+        public static Float[] box (float[] x){
             Float[] ret = new Float[x.length];
             for (int i = 0; i < x.length; i++) {
                 ret[i] = x[i];
@@ -130,8 +138,48 @@ public final class Util {
             return ret;
         }
 
-        public static Double[] box ( double[] x){
+        public static Double[] box (double[] x){
             Double[] ret = new Double[x.length];
+            for (int i = 0; i < x.length; i++) {
+                ret[i] = x[i];
+            }
+            return ret;
+        }
+
+        public static int[] unbox (Integer[] x){
+            int[] ret = new int[x.length];
+            for (int i = 0; i < x.length; i++) {
+                ret[i] = x[i];
+            }
+            return ret;
+        }
+
+        public static char[] unbox (Character[] x){
+            char[] ret = new char[x.length];
+            for (int i = 0; i < x.length; i++) {
+                ret[i] = x[i];
+            }
+            return ret;
+        }
+
+        public static long[] unbox (Long[] x){
+            long[] ret = new long[x.length];
+            for (int i = 0; i < x.length; i++) {
+                ret[i] = x[i];
+            }
+            return ret;
+        }
+
+        public static float[] unbox (Float[] x){
+            float[] ret = new float[x.length];
+            for (int i = 0; i < x.length; i++) {
+                ret[i] = x[i];
+            }
+            return ret;
+        }
+
+        public static double[] unbox (Double[] x){
+            double[] ret = new double[x.length];
             for (int i = 0; i < x.length; i++) {
                 ret[i] = x[i];
             }

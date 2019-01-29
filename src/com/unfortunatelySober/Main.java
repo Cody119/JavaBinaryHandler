@@ -2,9 +2,12 @@ package com.unfortunatelySober;
 
 import com.sun.xml.internal.messaging.saaj.util.ByteInputStream;
 import com.unfortunatelySober.annotations.*;
+import com.unfortunatelySober.serializer.CharArraySer;
 import com.unfortunatelySober.serializer.CompositeSerializer;
 import com.unfortunatelySober.serializer.IntArraySer;
 import com.unfortunatelySober.serializer.IntSerializer;
+import com.unfortunatelySober.util.ReflectionUtil;
+import com.unfortunatelySober.util.Util;
 
 import java.io.ByteArrayOutputStream;
 import java.lang.reflect.Field;
@@ -12,8 +15,8 @@ import java.util.function.BiConsumer;
 import java.util.function.BiFunction;
 
 
-import static com.unfortunatelySober.Util.Statics.box;
-import static com.unfortunatelySober.Util.Statics.s;
+import static com.unfortunatelySober.util.Util.Statics.box;
+import static com.unfortunatelySober.util.Util.Statics.s;
 
 
 //TODO error handling
@@ -56,20 +59,40 @@ public class Main {
         public int x;
         @SerializerField(order = 1)
         public int y;
-        @SerializerMethod(order = 2, action = SerializerMethodAction.SERIALIZE_ONLY, arguments = {"y"})
+        @SerializerMethod(order = 2, arguments = {"y"})
         public int getZ(int y) {
             System.out.println("get z: " + y);
             return z;
         }
-        @SerializerMethod(order = 2, action = SerializerMethodAction.DESERIALIZE_ONLY, arguments = {"y"})
+        @SerializerMethod(order = 2, arguments = {"x"})
         public void setZ(int zIn, int y) {
-            System.out.println("set z:" + y);
+            System.out.println("set x: " + y);
             z = zIn;
         }
 
         public int z;
 
 
+    }
+
+    public static class Box<T> {
+        public T v;
+    }
+
+    @Serializer
+    public static class test6 {
+
+        @SerializerMethod(order = 0, name = "n")
+        public int get() {
+            return x.length;
+        }
+
+        @SerializerMethod(order = 0, name = "n")
+        public void set(int x) {}
+
+        @SerializerField(order = 1, name = "x")
+        @SerializerConfig(deserializerArguments = {"n"})
+        public int[] x;
     }
 
     public static class test5 {
@@ -95,16 +118,9 @@ public class Main {
         test2();
         test3();
         test4();
+        test5();
+        test6();
 
-//        RAList<Integer> x = new RAList<>(10);
-//        System.out.println(x.set(15, 12));
-//        System.out.println(x.size());
-
-//        Util.with(test5.class.getMethods()[0].getParameterTypes(), x -> System.out.println(x.getName()));
-//        System.out.println(float[].class.getName());
-//        System.out.println(test5.class.getMethods()[0].isVarArgs());
-
-//        CompositeSerializer.test(test3.class, new test3());
     }
 
     static void test2() throws Exception {
@@ -181,6 +197,37 @@ public class Main {
         } catch (AssertionError e) {
             System.out.println("Assertion error found " + e.getMessage());
         }
+    }
+
+    public static void test5() throws Exception {
+        TBuf b = new TBuf(1024);
+
+        CompositeSerializer x = new CompositeSerializer.Builder()
+                .Constructor(Box::new)
+                .Names("l", "v")
+                .Getters(((o, v) -> ((Box<String>) o).v.length()), ((o, v) -> ((Box<String>) o).v.toCharArray()))
+                .Setters(((o, v) -> {}), ((o, v) -> ((Box<String>) o).v = new String((char[]) v[0])))
+                .Serializers(IntSerializer.INSTANCE, new CharArraySer())
+                .Arguments(s(), s("l"))
+                .build();
+
+        Box<String> test = new Box<>();
+        test.v = "Test";
+        x.serialize(test, b);
+        test = ((Box<String>) x.deserialize(new ByteInputStream(b.getBuf(), b.getBuf().length)));
+        System.out.println(test.v);
+    }
+
+    public static void test6() throws Exception {
+        CompositeSerializer s = CompositeSerializer.fromClass(test6.class);
+        TBuf b = new TBuf(1024);
+
+        test6 t = new test6();
+        t.x = new int[]{6, 7, 8, 9, 10};
+
+        s.serialize(t, b);
+        test6 t2 = (test6) s.deserialize(new ByteInputStream(b.getBuf(), b.getBuf().length));
+        Util.with(box(t2.x), x -> System.out.println(" - " + x.toString()));
     }
 
 }

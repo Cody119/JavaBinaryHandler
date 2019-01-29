@@ -1,12 +1,9 @@
 package com.unfortunatelySober.serializer;
 
-import com.unfortunatelySober.RAList;
-import com.unfortunatelySober.ReflectionUtil;
-import com.unfortunatelySober.Util;
-import com.unfortunatelySober.annotations.Constant;
-import com.unfortunatelySober.annotations.Serializer;
-import com.unfortunatelySober.annotations.SerializerField;
-import com.unfortunatelySober.annotations.SerializerMethod;
+import com.unfortunatelySober.util.RAList;
+import com.unfortunatelySober.util.ReflectionUtil;
+import com.unfortunatelySober.util.Util;
+import com.unfortunatelySober.annotations.*;
 
 import java.io.IOException;
 import java.io.InputStream;
@@ -17,7 +14,6 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.function.BiConsumer;
 import java.util.function.BiFunction;
-import java.util.function.Function;
 import java.util.function.Supplier;
 
 public class CompositeSerializer implements IISerializer {
@@ -28,14 +24,21 @@ public class CompositeSerializer implements IISerializer {
     private Class innerClass;
     private IDSerializer[] serializers;
     private String[] fieldNames;
-    private Integer[][] argumentTags;
+    private int[][] gArgumentTags;
+    private int[][] sArgumentTags;
+    private int[][] serArgumentTags;
+    private int[][] deserArgumentTags;
+
 
     private CompositeSerializer(Class clazzIn,
                                Supplier<Object> constructorIn,
                                String[] namesIn,
                                BiFunction<Object, Object[], Object>[] gettersIn,
                                BiConsumer<Object, Object[]>[] settersIn,
-                               String[][] arguments,
+                               String[][] getterArguments,
+                               String[][] setterArguments,
+                               String[][] serializersArguments,
+                               String[][] deserializersArguments,
                                IDSerializer ... serializersIn) {
         innerClass = clazzIn;
         constructor = constructorIn;
@@ -43,7 +46,10 @@ public class CompositeSerializer implements IISerializer {
         getters = gettersIn;
         setters = settersIn;
         serializers = serializersIn;
-        argumentTags = buildArgumentTable(arguments, namesIn);
+        gArgumentTags = buildArgumentTable(getterArguments, namesIn);
+        sArgumentTags = buildArgumentTable(setterArguments, namesIn);
+        serArgumentTags = buildArgumentTable(serializersArguments, namesIn);
+        deserArgumentTags = buildArgumentTable(deserializersArguments, namesIn);
     }
 
     @Override
@@ -56,8 +62,11 @@ public class CompositeSerializer implements IISerializer {
         Object o = constructor.get();
         final Object[] objects = new Object[serializers.length];
         for (int i = 0; i < serializers.length; i++) {
-            Object[] arguments = Util.map(argumentTags[i], j -> objects[j], Object[]::new);
+
+            Object[] arguments = Util.map(deserArgumentTags[i], j -> objects[j], new Object[deserArgumentTags[i].length]);
             Object oi = serializers[i].deserializeWith(stream, arguments);
+
+            arguments = Util.map(sArgumentTags[i], j -> objects[j], new Object[sArgumentTags[i].length]);
             Object[] arguments2 = new Object[arguments.length + 1];
             System.arraycopy(arguments, 0, arguments2, 1, arguments.length);
             arguments2[0] = oi;
@@ -71,40 +80,45 @@ public class CompositeSerializer implements IISerializer {
     public void serialize(Object e, OutputStream stream) throws IOException {
         final Object[] objects = new Object[serializers.length];
         for (int i = 0; i < serializers.length; i++) {
-            Object[] arguments = Util.map(argumentTags[i], j -> objects[j], Object[]::new);
+            Object[] arguments = Util.map(gArgumentTags[i], j -> objects[j], new Object[gArgumentTags[i].length]);
             Object o = getters[i].apply(e, arguments);
+
+            arguments = Util.map(serArgumentTags[i], j -> objects[j], new Object[serArgumentTags[i].length]);
             serializers[i].serializeWith(o, stream, arguments);
             objects[i] = o;
         }
     }
 
-    public static Integer[][] buildArgumentTable(String[][] arguments, String[] names) {
-        Integer[][] argumentTags;
+    public static int[][] buildArgumentTable(String[][] arguments, String[] names) {
+        int[][] argumentTags;
         if (arguments != null) {
-            argumentTags = new Integer[names.length][];
+            argumentTags = new int[names.length][];
             HashMap<String, Integer> map = new HashMap<>(argumentTags.length);// = Util.addToMap(names, Util.rangeW(names.length));
 
             for (int i = 0; i < arguments.length; i++) {
-                argumentTags[i] = Util.map(arguments[i], x -> {
-                    Integer s = map.get(x);
-                    if (s == null) throw new RuntimeException("Forward reference to " + x);
-                    return s;
-                }, Integer[]::new);
+                argumentTags[i] = arguments[i] == null ?
+                    new int[0] : Util.map(arguments[i], x -> {
+                        Integer s = map.get(x);
+                        if (s == null)
+                            throw new RuntimeException("Forward reference to " + x);
+                        return s;
+                });
 
                 //Gradually add to the map so no forward reference's exist
                 map.put(names[i], i);
             }
-            //argument array can be less then the name array, so fill in the rest
+            //arguments array can be less then the name array, so fill in the rest
             for (int i = arguments.length; i < names.length; i++) {
-                argumentTags[i] = new Integer[0];
+                argumentTags[i] = new int[0];
             }
         } else {
-            argumentTags = new Integer[names.length][0];
+            argumentTags = new int[names.length][0];
         }
+
         return argumentTags;
     }
 
-    public static CompositeSerializer fromClass(Class clazz) throws NoSuchMethodException {
+    public static CompositeSerializer fromClass(Class clazz) {
         Serializer x;
         if ((x = (Serializer) clazz.getAnnotation(Serializer.class)) == null) {
             return new Builder().Class(clazz).build();
@@ -113,12 +127,20 @@ public class CompositeSerializer implements IISerializer {
         }
     }
 
-    private static CompositeSerializer specificBuild(Serializer x, Class clazz) throws NoSuchMethodException {
+    private static CompositeSerializer specificBuild(Serializer x, Class clazz) {
         Method[] methods = ReflectionUtil.getMethods(clazz, x.access());
         RAList<Method> getterMeths = new RAList<>(Serializers.DEFAULT_SIZE);
         RAList<Method> setterMeths = new RAList<>(Serializers.DEFAULT_SIZE);
         RAList<String> names = new RAList<>(Serializers.DEFAULT_SIZE);
-        RAList<String[]> arguments = new RAList<>(Serializers.DEFAULT_SIZE);
+        RAList<String[]> getterArguments = new RAList<>(Serializers.DEFAULT_SIZE);
+        RAList<String[]> setterArguments = new RAList<>(Serializers.DEFAULT_SIZE);
+        RAList<String[]> fieldArguments = new RAList<>(Serializers.DEFAULT_SIZE);
+
+        RAList<String[]> serializerArguments = new RAList<>(Serializers.DEFAULT_SIZE);
+        RAList<String[]> deserializerArguments = new RAList<>(Serializers.DEFAULT_SIZE);
+
+        Field[] fields = ReflectionUtil.getFields(clazz, x.access());
+        RAList<Field> sortedFields = new RAList<>(Serializers.DEFAULT_SIZE);
 
         for (Method method : methods) {
             SerializerMethod serializerField;
@@ -128,27 +150,49 @@ public class CompositeSerializer implements IISerializer {
                 switch (serializerField.action()) {
                     case SERIALIZE_ONLY:
                         getterMeths.set(i, method);
+                        getterArguments.set(i, serializerField.arguments());
                         break;
                     case DESERIALIZE_ONLY:
                         setterMeths.set(i, method);
+                        setterArguments.set(i, serializerField.arguments());
+                        break;
+                    case INFER:
+                        if (method.getReturnType() != void.class) {
+                            getterMeths.set(i, method);
+                            getterArguments.set(i, serializerField.arguments());
+                        } else if (method.getParameterTypes().length > 0) {
+                            setterMeths.set(i, method);
+                            setterArguments.set(i, serializerField.arguments());
+                        } else {
+                            throw new RuntimeException("Could not infer method " + method.getName());
+                        }
                         break;
                 }
-                arguments.set(i, serializerField.arguments());
+
+                SerializerConfig serializerConfig;
+                if ((serializerConfig = method.getAnnotation(SerializerConfig.class)) != null) {
+                    serializerArguments.set(i, serializerConfig.serializerArguments());
+                    deserializerArguments.set(i, serializerConfig.deserializerArguments());
+                }
+
                 names.set(i, serializerField.name().isEmpty() ? method.getName() : serializerField.name());
             }
         }
-
-        Field[] fields = ReflectionUtil.getFields(clazz, x.access());
-        RAList<Field> sortedFields = new RAList<>(Serializers.DEFAULT_SIZE);
 
         for (Field f : fields) {
             SerializerField serializerField;
             if ((serializerField = f.getAnnotation(SerializerField.class)) != null) {
                 int i = serializerField.order();
 
-                arguments.set(i, serializerField.arguments());
+                fieldArguments.set(i, serializerField.arguments());
                 names.set(i, f.getName());
                 sortedFields.set(i, f);
+
+                SerializerConfig serializerConfig;
+                if ((serializerConfig = f.getAnnotation(SerializerConfig.class)) != null) {
+                    serializerArguments.set(i, serializerConfig.serializerArguments());
+                    deserializerArguments.set(i, serializerConfig.deserializerArguments());
+                }
             }
         }
 
@@ -167,35 +211,13 @@ public class CompositeSerializer implements IISerializer {
 
         BiFunction<Object, Object[], Object>[] getters = new BiFunction[size];
         BiConsumer<Object, Object[]>[] setters = new BiConsumer[size];
-//
-//        for (int i = 0; i < size; i++) {
-//            if (getterMeths.get(i) != null) {
-//                getters[i] = ReflectionUtil.getterHandle(getterMeths.get(i));
-//            }
-//        }
-//        for (int i = 0; i < size; i++) {
-//            if (setterMeths.get(i) != null) {
-//                setters[i] = ReflectionUtil.setterHandle(setterMeths.get(i));
-//            }
-//        }
-//        for (int i = 0; i < sortedFields.size(); i++) {
-//            if (sortedFields.get(i) != null) {
-//                boolean unussed = true;
-//                if (getterMeths.get(i) == null) {
-//                    getters[i] = ReflectionUtil.getterHandle(sortedFields.get(i));
-//                    unussed = false;
-//                }
-//                if (setterMeths.get(i) == null) {
-//                    setters[i] = ReflectionUtil.setterHandle(sortedFields.get(i));
-//                    unussed = false;
-//                }
-//                if (unussed) {
-//                    throw new RuntimeException("Field unused: " + sortedFields.get(i).getName());
-//                }
-//            }
-//        }
+
 
         Map<String, Class> typeMap = new HashMap<>();
+        String[][] getterArgumentsNames = new String[size][];
+        String[][] setterArgumentsNames = new String[size][];
+
+        Class[] types = new Class[size];
 
         for (int i = 0; i < size; i++) {
             Method getterMethod = getterMeths.get(i);
@@ -217,28 +239,33 @@ public class CompositeSerializer implements IISerializer {
 
             if (type == null) throw new RuntimeException("Type Discern failed");
 
-            Class[] getterTypes = Util.map(arguments.get(i), typeMap::get, Class[]::new);
+
+
             if (gM) {
+                Class[] getterTypes = Util.map(getterArguments.get(i), typeMap::get, Class[]::new);
                 if (!ReflectionUtil.checkArguments(getterMethod, getterTypes) || !type.isAssignableFrom(getterMethod.getReturnType()))
                     throw new RuntimeException("Argument check failed for getter");
                 getters[i] = ReflectionUtil.getterHandle(getterMethod);
+                getterArgumentsNames[i] = getterArguments.get(i);
             } else {
                 getters[i] = ReflectionUtil.getterHandle(field);
+                getterArgumentsNames[i] = fieldArguments.get(i);
             }
 
             if (sM) {
-                Class[] setterTypes = new Class[getterTypes.length + 1];
-                System.arraycopy(getterTypes, 0, setterTypes, 1, getterTypes.length);
+                Class[] setterTypes = Util.map(setterArguments.get(i), typeMap::get, Class[]::new, 1);
                 setterTypes[0] = type;
 
                 if (!ReflectionUtil.checkArguments(setterMethod, setterTypes))
                     throw new RuntimeException("Argument check failed for setter");
                 setters[i] = ReflectionUtil.setterHandle(setterMethod);
+                setterArgumentsNames[i] = setterArguments.get(i);
             } else {
                 setters[i] = ReflectionUtil.setterHandle(field);
+                setterArgumentsNames[i] = fieldArguments.get(i);
             }
 
-
+            types[i] = type;
             typeMap.put(names.get(i), type);
         }
 
@@ -249,11 +276,23 @@ public class CompositeSerializer implements IISerializer {
         }
 
 
-        IDSerializer[] serializers = Util.map(getters, f -> IntSerializer.INSTANCE, IDSerializer[]::new);
+        IDSerializer[] serializers = new IDSerializer[size];
+        for (int i = 0; i < size; i++) {
+            serializers[i] = Serializers.getSerializer(types[i]);
+        }
 
         Supplier<Object> constructor = ReflectionUtil.constructorHandle(clazz);
 
-        return new CompositeSerializer(clazz, constructor, names.toArray(String[]::new), getters, setters, arguments.toArray(String[][]::new), serializers);
+        return new CompositeSerializer(
+                clazz,
+                constructor,
+                names.toArray(new String[names.size()]),
+                getters,
+                setters,
+                getterArgumentsNames, setterArgumentsNames,
+                serializerArguments.toArray(new String[names.size()][]),
+                deserializerArguments.toArray(new String[names.size()][]),
+                serializers);
     }
 
     //TODO lengths
@@ -331,7 +370,7 @@ public class CompositeSerializer implements IISerializer {
         }
 
         //TODO split cases to separate builders?
-        public final CompositeSerializer build() throws NoSuchMethodException {
+        public final CompositeSerializer build() {
             if (clazz == null) {
                 if (Util.check(Objects::isNull, constructor, names, getters, setters, serializers)) {
                     throw new RuntimeException("Not enough information to build object");
@@ -358,59 +397,7 @@ public class CompositeSerializer implements IISerializer {
                 }
             }
 
-            return new CompositeSerializer(clazz, constructor, names, getters, setters, arguments, serializers);
+            return new CompositeSerializer(clazz, constructor, names, getters, setters, arguments, arguments, arguments, arguments, serializers);
         }
     }
-
-//        private void specificBuildt(Serializer x) {
-//            Field[] fields = ReflectionUtil.getFields(clazz, x.access());
-//            Field[] sorted = new Field[fields.length];
-//            arguments = new String[fields.length][];
-//            names = new String[fields.length];
-//            for (Field f : fields) {
-//                SerializerField serializerField;
-//                if ((serializerField = f.getAnnotation(SerializerField.class)) != null) {
-//                    int i = serializerField.order();
-//                    arguments[i] = serializerField.arguments();
-//                    names[i] = f.getName();
-//                    sorted[i] = f;
-//                }
-//            }
-//
-//            int i = 0;
-//            for (; i < sorted.length; i++) {
-//                if (sorted[i] == null) {
-//                    break;
-//                }
-//            }
-//            int j = i;
-//            for (; i < sorted.length; i++) {
-//                if (sorted[i] != null) {
-//                    i++;
-//                    throw new RuntimeException(clazz.getName() + " is missing fields for " + j + " to " + i);
-//                }
-//            }
-//            sorted = Arrays.copyOf(sorted, j, Field[].class);
-//            arguments = Arrays.copyOf(arguments, j, String[][].class);
-//            names = Arrays.copyOf(names, j, String[].class);
-//
-//            if (getters == null) {
-//                GFields(sorted);
-//            }
-//            if (setters == null) {
-//                SFields(sorted);
-//            }
-//            if (serializers == null) {
-//                serializers = Util.map(fields, f -> Serializers.getSerializer(f.getType()), IDSerializer[]::new);
-//            }
-//
-//        }
-
-//    public static void test(Class clazz, Object o) {
-//        try {
-//            System.out.println(clazz.getField("t").get(o));
-//        } catch (Exception e) {
-//            throw new RuntimeException(e);
-//        }
-//    }
 }
