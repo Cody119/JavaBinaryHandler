@@ -89,6 +89,14 @@ public class CompositeSerializer implements IISerializer {
         }
     }
 
+
+    /**
+     * Takes all the strings in the supplied "arguments" and creates an identical 2D array
+     * were each string is replaced with its index in the "names" array
+     * @param arguments
+     * @param names
+     * @return
+     */
     public static int[][] buildArgumentTable(String[][] arguments, String[] names) {
         int[][] argumentTags;
         if (arguments != null) {
@@ -118,29 +126,76 @@ public class CompositeSerializer implements IISerializer {
         return argumentTags;
     }
 
+    /**
+     * Same as {@link #fromClass(Class, SerializerBundle) fromClass(Class, SerializerBundle)} but with
+     * the default serializer bundle used {@link SerializerBundle#INSTANCE SerializerBundle.INSTANCE}
+     * @param clazz the class to create the serializer from
+     * @return A serializer for the class provided
+     */
     public static CompositeSerializer fromClass(Class clazz) {
+        return fromClass(clazz, SerializerBundle.INSTANCE);
+    }
+
+    /**
+     * Create a CompositeSerializer from a class, if the class is annotated the annotations will
+     * be used to build the serializer, otherwise all the public fields will be used
+     * @param clazz the class to create the serializer from
+     * @param sb the SerializerBundle to use during creation
+     * @return A serializer for the class provided
+     */
+    public static CompositeSerializer fromClass(Class clazz, SerializerBundle sb) {
         Serializer x;
         if ((x = (Serializer) clazz.getAnnotation(Serializer.class)) == null) {
-            return new Builder().Class(clazz).build();
+            return new Builder().Class(clazz).build(sb);
         } else {
-            return specificBuild(x, clazz);
+            return buildAnnotatedSerializer(x, clazz, sb);
         }
     }
 
-    private static CompositeSerializer specificBuild(Serializer x, Class clazz) {
-        Method[] methods = ReflectionUtil.getMethods(clazz, x.access());
-        RAList<Method> getterMeths = new RAList<>(Serializers.DEFAULT_SIZE);
-        RAList<Method> setterMeths = new RAList<>(Serializers.DEFAULT_SIZE);
-        RAList<String> names = new RAList<>(Serializers.DEFAULT_SIZE);
-        RAList<String[]> getterArguments = new RAList<>(Serializers.DEFAULT_SIZE);
-        RAList<String[]> setterArguments = new RAList<>(Serializers.DEFAULT_SIZE);
-        RAList<String[]> fieldArguments = new RAList<>(Serializers.DEFAULT_SIZE);
+    /**
+     * Same as {@link #fromAnnotatedClass(Class, SerializerBundle) fromAnnotatedClass(Class, SerializerBundle)} but with
+     * the default serializer bundle used {@link SerializerBundle#INSTANCE SerializerBundle.INSTANCE}
+     * @param clazz the class to create the serializer from
+     * @return A serializer for the class provided
+     */
+    public static CompositeSerializer fromAnnotatedClass(Class clazz) {
+        return fromAnnotatedClass(clazz, SerializerBundle.INSTANCE);
+    }
 
-        RAList<String[]> serializerArguments = new RAList<>(Serializers.DEFAULT_SIZE);
-        RAList<String[]> deserializerArguments = new RAList<>(Serializers.DEFAULT_SIZE);
+    /**
+     * Create a CompositeSerializer from a annotated class, if the class is not annotated an
+     * error will be raised
+     * @param clazz the class to create the serializer from
+     * @param sb the SerializerBundle to use during creation
+     * @return A serializer for the class provided
+     */
+    public static CompositeSerializer fromAnnotatedClass(Class clazz, SerializerBundle sb) {
+        Serializer x;
+        if ((x = (Serializer) clazz.getAnnotation(Serializer.class)) == null) {
+            return new Builder().Class(clazz).build(sb);
+        } else {
+            throw new RuntimeException("Class isnt annotated with a @Serializer annotation");
+        }
+    }
+
+    private static CompositeSerializer buildAnnotatedSerializer(Serializer x, Class clazz) {
+        return buildAnnotatedSerializer(x, clazz, SerializerBundle.INSTANCE);
+    }
+
+    private static CompositeSerializer buildAnnotatedSerializer(Serializer x, Class clazz, SerializerBundle sb) {
+        Method[] methods = ReflectionUtil.getMethods(clazz, x.access());
+        RAList<Method> getterMeths = new RAList<>(SerializerBundle.DEFAULT_SIZE);
+        RAList<Method> setterMeths = new RAList<>(SerializerBundle.DEFAULT_SIZE);
+        RAList<String> names = new RAList<>(SerializerBundle.DEFAULT_SIZE);
+        RAList<String[]> getterArguments = new RAList<>(SerializerBundle.DEFAULT_SIZE);
+        RAList<String[]> setterArguments = new RAList<>(SerializerBundle.DEFAULT_SIZE);
+        RAList<String[]> fieldArguments = new RAList<>(SerializerBundle.DEFAULT_SIZE);
+
+        RAList<String[]> serializerArguments = new RAList<>(SerializerBundle.DEFAULT_SIZE);
+        RAList<String[]> deserializerArguments = new RAList<>(SerializerBundle.DEFAULT_SIZE);
 
         Field[] fields = ReflectionUtil.getFields(clazz, x.access());
-        RAList<Field> sortedFields = new RAList<>(Serializers.DEFAULT_SIZE);
+        RAList<Field> sortedFields = new RAList<>(SerializerBundle.DEFAULT_SIZE);
 
         for (Method method : methods) {
             SerializerMethod serializerField;
@@ -278,7 +333,7 @@ public class CompositeSerializer implements IISerializer {
 
         IDSerializer[] serializers = new IDSerializer[size];
         for (int i = 0; i < size; i++) {
-            serializers[i] = Serializers.getSerializer(types[i]);
+            serializers[i] = sb.getSerializer(types[i]);
         }
 
         Supplier<Object> constructor = ReflectionUtil.constructorHandle(clazz);
@@ -295,7 +350,7 @@ public class CompositeSerializer implements IISerializer {
                 serializers);
     }
 
-    //TODO lengths
+    //Builder class for testing purposes, need to be massively rewritten
     public static final class Builder {
 
         private Class clazz;
@@ -354,9 +409,9 @@ public class CompositeSerializer implements IISerializer {
 
             setters = Util.map(fields, f -> {
                 if (Modifier.isFinal(f.getModifiers())) {
-                    return Serializers.cSetterHandle(f);
+                    return ReflectionUtil.cSetterHandle(f);
                 } else if (f.getAnnotation(Constant.class) != null) {
-                    return Serializers.cSetterHandle(f);
+                    return ReflectionUtil.cSetterHandle(f);
                 } else {
                     return ReflectionUtil.setterHandle(f);
                 }
@@ -369,8 +424,11 @@ public class CompositeSerializer implements IISerializer {
             return this;
         }
 
-        //TODO split cases to separate builders?
         public final CompositeSerializer build() {
+            return build(SerializerBundle.INSTANCE);
+        }
+
+        public final CompositeSerializer build(SerializerBundle sb) {
             if (clazz == null) {
                 if (Util.check(Objects::isNull, constructor, names, getters, setters, serializers)) {
                     throw new RuntimeException("Not enough information to build object");
@@ -393,7 +451,7 @@ public class CompositeSerializer implements IISerializer {
                     SFields(fields);
                 }
                 if (serializers == null) {
-                    serializers = Util.map(fields, f -> Serializers.getSerializer(f.getType()), IDSerializer[]::new);
+                    serializers = Util.map(fields, f -> sb.getSerializer(f.getType()), IDSerializer[]::new);
                 }
             }
 

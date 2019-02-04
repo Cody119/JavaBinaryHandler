@@ -202,6 +202,7 @@ public class Main {
     public static void test5() throws Exception {
         TBuf b = new TBuf(1024);
 
+        //Build a serializer for a boxed string
         CompositeSerializer x = new CompositeSerializer.Builder()
                 .Constructor(Box::new)
                 .Names("l", "v")

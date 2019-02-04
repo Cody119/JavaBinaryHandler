@@ -1,7 +1,6 @@
 package com.unfortunatelySober.util;
 
 import com.unfortunatelySober.annotations.AccessMod;
-import com.unfortunatelySober.util.Util;
 
 import java.lang.reflect.Constructor;
 import java.lang.reflect.Field;
@@ -64,7 +63,7 @@ public class ReflectionUtil {
                 try {
                     return c.newInstance();
                 } catch (InstantiationException | InvocationTargetException | IllegalAccessException e) {
-                    //This branch should never be reached?
+                    //This branch should never be reached
                     e.printStackTrace();
                     return null;
                 }
@@ -75,6 +74,11 @@ public class ReflectionUtil {
 
     }
 
+    /**
+     *
+     * @param f
+     * @return
+     */
     public static BiFunction<Object, Object[], Object> getterHandle(Field f) {
         return (x, v) -> {
             try {
@@ -115,6 +119,12 @@ public class ReflectionUtil {
         };
     }
 
+    /**
+     * Gets all the public fields identified by the names in the "names" argument
+     * @param clazz the class to get the fields from
+     * @param names the names of the fields to retrieve
+     * @return an array of all the fields requested, in the order they were supplied in the "names" array
+     */
     public static Field[] getFields(Class clazz, String[] names) {
         Field[] fields = clazz.getFields();
         HashMap<String, Field> map = new HashMap<>(fields.length);
@@ -130,6 +140,15 @@ public class ReflectionUtil {
         return Util.map(names, map::get, Field[]::new);
     }
 
+    /**
+     * Check if the method supplied can accept arguments of the types specified in the "arguments" array,
+     * in the order they are given
+     * <P>
+     * Will check for varargs and if the
+     * @param m the method to test
+     * @param arguments the types, in the order that they will be suplied in, to give to the method
+     * @return true if the method can be called with the parameter types given, false otherwise
+     */
     public static boolean checkArguments(Method m, Class[] arguments) {
         Class[] testArgs = m.getParameterTypes();
         if (m.isVarArgs()) {
@@ -149,11 +168,28 @@ public class ReflectionUtil {
         }
     }
 
+    /**
+     * Determines whether each type in args2 is assignable to the type
+     * with the same index in args1, essentially checks
+     * {@code args1[i].isAssignableFrom(args2[i])} for each element
+     * @param args1
+     * @param args2
+     * @return true if args2's elements can be assigned to arg1's
+     */
     public static boolean checkArguments(Class[] args1, Class[] args2) {
         if (args1.length != args2.length) return false;
         return checkArguments(args1, args2, args1.length);
     }
 
+    /**
+     * Determines whether all the types up to (but not including) the type at index 'count'
+     * in args2 is assignable to the type with the same index in args1, essentially checks
+     * {@code args1[i].isAssignableFrom(args2[i])} for each element up to "count"
+     * @param args1
+     * @param args2
+     * @param count the index to check up to (but not including)
+     * @return true if args2's elements can be assigned to arg1's
+     */
     public static boolean checkArguments(Class[] args1, Class[] args2, int count) {
         for (int i = 0; i < count; i++) {
             if (!args1[i].isAssignableFrom(args2[i])) {
@@ -163,10 +199,14 @@ public class ReflectionUtil {
         return true;
     }
 
-    public static Function<Object[], Object> generateGetter() {
-        return null;
-    }
-
+    /**
+     * determines which of the types supplied is the super of all other types given.
+     * nulls are allowed and will be ignored, if none of the classes suplied meet
+     * that condition null is returned
+     *
+     * @param types the types to be checked
+     * @return The super type of all the classes given, or null if that class is not in the list
+     */
     public static Class typeDiscern(Class ... types) {
         if (types.length == 0) return null;
         Class type = types[0];
@@ -187,4 +227,16 @@ public class ReflectionUtil {
         return type;
     }
 
+    public static BiConsumer<Object, Object[]> cSetterHandle(Field f) {
+        BiFunction<Object, Object[], Object> g = getterHandle(f);
+        return (o, v) -> {assert g.apply(o, null).equals(v);};
+    }
+
+    public static BiConsumer<Object, Object> sSetterHandle(Object oIn) {
+        return (o, v) -> {assert oIn.equals(v);};
+    }
+
+    public static Function<Object, Object> sGetterHandle(Object oIn) {
+        return (o) -> oIn;
+    }
 }
