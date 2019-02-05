@@ -101,6 +101,22 @@ public final class Util {
         }
     }
 
+    public static String inferFieldName(String methodName, boolean getter) {
+        if (getter) {
+            if (methodName.startsWith("get")) {
+                return ("" + methodName.charAt(3)).toLowerCase() + methodName.substring(4);
+            } else {
+                return null;
+            }
+        } else {
+            if (methodName.startsWith("set")) {
+                return ("" + methodName.charAt(3)).toLowerCase() + methodName.substring(4);
+            } else {
+                return null;
+            }
+        }
+    }
+
     public final static class Statics{
         public static String[] s (String ...args){
             return args;

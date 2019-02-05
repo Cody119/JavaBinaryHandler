@@ -201,25 +201,34 @@ public class CompositeSerializer implements IISerializer {
             SerializerMethod serializerField;
             if ((serializerField = method.getAnnotation(SerializerMethod.class)) != null) {
                 int i = serializerField.order();
+                boolean getter = false;
 
                 switch (serializerField.action()) {
-                    case SERIALIZE_ONLY:
+                    case GETTER:
                         getterMeths.set(i, method);
                         getterArguments.set(i, serializerField.arguments());
+                        getter = true;
                         break;
-                    case DESERIALIZE_ONLY:
+                    case SETTER:
                         setterMeths.set(i, method);
                         setterArguments.set(i, serializerField.arguments());
+                        getter = false;
                         break;
                     case INFER:
                         if (method.getReturnType() != void.class) {
                             getterMeths.set(i, method);
                             getterArguments.set(i, serializerField.arguments());
+                            getter = true;
                         } else if (method.getParameterTypes().length > 0) {
                             setterMeths.set(i, method);
                             setterArguments.set(i, serializerField.arguments());
+                            getter = false;
                         } else {
-                            throw new RuntimeException("Could not infer method " + method.getName());
+                            throw new RuntimeException(
+                                    "Could not infer method " + method.getName() +
+                                    ", method must either return void (getter) or have " +
+                                    "at least one argument (setter)"
+                            );
                         }
                         break;
                 }
@@ -230,7 +239,22 @@ public class CompositeSerializer implements IISerializer {
                     deserializerArguments.set(i, serializerConfig.deserializerArguments());
                 }
 
-                names.set(i, serializerField.name().isEmpty() ? method.getName() : serializerField.name());
+                String name;
+                if (serializerField.name().isEmpty()) {
+                    name = Util.inferFieldName(method.getName(), getter);
+                    if (name == null) {
+                        throw new RuntimeException(
+                                "Method " + method.getName() +
+                                " is named wrong, it should start with " +
+                                (getter ? "\"get\"" : "\"set\"") +
+                                " (java beans getter and setter notation) " +
+                                "or a name should be supplied"
+                        );
+                    }
+                } else {
+                    name = serializerField.name();
+                }
+                names.set(i, name);
             }
         }
 
@@ -283,8 +307,13 @@ public class CompositeSerializer implements IISerializer {
             boolean sM = setterMethod != null;
             boolean fM = field != null;
 
-            if (fM && gM && sM) throw new RuntimeException("Field unused: " + field.getName());
-            if (!fM && !(gM || sM)) throw new RuntimeException("no handle for: " + i);
+            if (fM && gM && sM)
+                throw new RuntimeException("Field annotated and unused: " + field.getName());
+            if (!fM && !(gM && sM))
+                throw new RuntimeException(
+                        "No handle for field " + names.get(i) + "'s " +
+                        ((!gM && !sM)? "getter and setter" : gM ? "setter" : "getter")
+                );
 
             Class type = ReflectionUtil.typeDiscern(
                     gM ? getterMethod.getReturnType() : null,
@@ -292,14 +321,15 @@ public class CompositeSerializer implements IISerializer {
                     fM ? field.getType() : null
             );
 
-            if (type == null) throw new RuntimeException("Type Discern failed");
+            if (type == null)
+                throw new RuntimeException("Type Discern failed for field: " + names.get(i));
 
 
 
             if (gM) {
                 Class[] getterTypes = Util.map(getterArguments.get(i), typeMap::get, Class[]::new);
                 if (!ReflectionUtil.checkArguments(getterMethod, getterTypes) || !type.isAssignableFrom(getterMethod.getReturnType()))
-                    throw new RuntimeException("Argument check failed for getter");
+                    throw new RuntimeException("Argument check failed for getter for field: " + names.get(i));
                 getters[i] = ReflectionUtil.getterHandle(getterMethod);
                 getterArgumentsNames[i] = getterArguments.get(i);
             } else {
@@ -312,7 +342,7 @@ public class CompositeSerializer implements IISerializer {
                 setterTypes[0] = type;
 
                 if (!ReflectionUtil.checkArguments(setterMethod, setterTypes))
-                    throw new RuntimeException("Argument check failed for setter");
+                    throw new RuntimeException("Argument check failed for setter for field: " + names.get(i));
                 setters[i] = ReflectionUtil.setterHandle(setterMethod);
                 setterArgumentsNames[i] = setterArguments.get(i);
             } else {
@@ -326,7 +356,7 @@ public class CompositeSerializer implements IISerializer {
 
         for (int i = 0; i < getters.length; i++) {
             if (getters[i] == null || setters[i] == null) {
-                throw new RuntimeException(clazz.getName() + " is missing fields for " + i);
+                throw new RuntimeException(clazz.getName() + " is missing fields for " + names.get(i));
             }
         }
 

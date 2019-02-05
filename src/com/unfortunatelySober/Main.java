@@ -82,15 +82,15 @@ public class Main {
     @Serializer
     public static class test6 {
 
-        @SerializerMethod(order = 0, name = "n")
-        public int get() {
+        @SerializerMethod(order = 0)
+        public int getN() {
             return x.length;
         }
 
-        @SerializerMethod(order = 0, name = "n")
-        public void set(int x) {}
+        @SerializerMethod(order = 0)
+        public void setN(int x) {}
 
-        @SerializerField(order = 1, name = "x")
+        @SerializerField(order = 1)
         @SerializerConfig(deserializerArguments = {"n"})
         public int[] x;
     }
@@ -120,6 +120,7 @@ public class Main {
         test4();
         test5();
         test6();
+
 
     }
 
