@@ -1,6 +1,5 @@
 package com.unfortunatelySober;
 
-import com.sun.xml.internal.messaging.saaj.util.ByteInputStream;
 import com.unfortunatelySober.annotations.*;
 import com.unfortunatelySober.serializer.CharArraySer;
 import com.unfortunatelySober.serializer.CompositeSerializer;
@@ -9,6 +8,7 @@ import com.unfortunatelySober.serializer.IntSerializer;
 import com.unfortunatelySober.util.ReflectionUtil;
 import com.unfortunatelySober.util.Util;
 
+import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.lang.reflect.Field;
 import java.util.function.BiConsumer;
@@ -133,7 +133,7 @@ public class Main {
         t.z = 19;
 
         x.serialize(t, b);
-        test t2 = (test) x.deserialize(new ByteInputStream(b.getBuf(), b.getBuf().length));
+        test t2 = (test) x.deserialize(new ByteArrayInputStream(b.getBuf(), 0, b.getBuf().length));
         System.out.println(t2.x + ", " + t2.y + ", " + t2.z);
     }
 
@@ -146,7 +146,7 @@ public class Main {
         t.z = 19;
 
         x.serialize(t, b);
-        test4 t2 = (test4) x.deserialize(new ByteInputStream(b.getBuf(), b.getBuf().length));
+        test4 t2 = (test4) x.deserialize(new ByteArrayInputStream(b.getBuf(), 0, b.getBuf().length));
         System.out.println(t2.x + ", " + t2.y + ", " + t2.z);
     }
 
@@ -177,7 +177,7 @@ public class Main {
 
 
         y.serialize(t, b);
-        test2 t2 = (test2) y.deserialize(new ByteInputStream(b.getBuf(), b.getBuf().length));
+        test2 t2 = (test2) y.deserialize(new ByteArrayInputStream(b.getBuf(), 0, b.getBuf().length));
         Util.with(box(t2.x), x -> System.out.println(" - " + x.toString()));
         System.out.println(t.t);
 
@@ -193,7 +193,7 @@ public class Main {
         x.serialize(new test3(10), new TBuf(b.getBuf()));
 
         try {
-            test3 t2 = (test3) x.deserialize(new ByteInputStream(b.getBuf(), b.getBuf().length));
+            test3 t2 = (test3) x.deserialize(new ByteArrayInputStream(b.getBuf(), 0, b.getBuf().length));
             System.out.println(t2.t);
         } catch (AssertionError e) {
             System.out.println("Assertion error found " + e.getMessage());
@@ -216,7 +216,7 @@ public class Main {
         Box<String> test = new Box<>();
         test.v = "Test";
         x.serialize(test, b);
-        test = ((Box<String>) x.deserialize(new ByteInputStream(b.getBuf(), b.getBuf().length)));
+        test = ((Box<String>) x.deserialize(new ByteArrayInputStream(b.getBuf(),0, b.getBuf().length)));
         System.out.println(test.v);
     }
 
@@ -228,7 +228,7 @@ public class Main {
         t.x = new int[]{6, 7, 8, 9, 10};
 
         s.serialize(t, b);
-        test6 t2 = (test6) s.deserialize(new ByteInputStream(b.getBuf(), b.getBuf().length));
+        test6 t2 = (test6) s.deserialize(new ByteArrayInputStream(b.getBuf(), 0, b.getBuf().length));
         Util.with(box(t2.x), x -> System.out.println(" - " + x.toString()));
     }
 

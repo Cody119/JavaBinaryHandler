@@ -197,6 +197,7 @@ public class CompositeSerializer implements IISerializer {
         Field[] fields = ReflectionUtil.getFields(clazz, x.access());
         RAList<Field> sortedFields = new RAList<>(SerializerBundle.DEFAULT_SIZE);
 
+        // Extract all the methods 
         for (Method method : methods) {
             SerializerMethod serializerField;
             if ((serializerField = method.getAnnotation(SerializerMethod.class)) != null) {
